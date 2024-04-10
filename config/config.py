@@ -9,8 +9,8 @@ database = 'sqlite:///database/helpdesk.db'
 # mail
 
 send_to_admins = ['darius.olechnovic@vrsa.lt']  # 'Vitalij.moroz@vrsa.lt', '', '', '', '', '']
-email = 'darius.olechnovic@vrsa.lt'
-mpassword = 'Vrsa2024*.'
+sender_email = 'helpdesk@vrsa.lt'
+sender_password = 'Rajonas2024+'
 
 
 def stconfig():

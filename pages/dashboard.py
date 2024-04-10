@@ -3,7 +3,7 @@ import streamlit as st
 from sqlalchemy import create_engine, desc
 from sqlalchemy.orm import sessionmaker
 from database.database import Base, Ticket, User  # Admin
-from pages.Login import StreamlitAuth
+from pages.login import StreamlitAuth
 from config.config import stconfig, database
 from integrations.AD import get_responsible
 from streamlit_extras.stylable_container import stylable_container
@@ -19,7 +19,7 @@ class HelpdeskApp:
         self.session = session()
         self.responsible = get_responsible()
         self.tickets = None
-        self.tickets_per_page = 10
+        self.tickets_per_page = 15
         if "current_page" not in st.session_state:
             st.session_state["current_page"] = 1
         self.date_format = '%Y-%m-%d %H:%M'
@@ -211,13 +211,17 @@ class HelpdeskApp:
             save = st.button("Išsaugoti", key="button" + keyid + str(idx) + "-")
 
             if save:
+                if status == "Sukurta" and responsible != " ":
+                    status = "Vykdoma"
                 self.update_ticket_status(ticket.id, status, responsible, idx, keyid)
                 self.show_more = None
                 del st.session_state["checkbox" + keyid + str(idx)]
                 if "checkbox" + keyid + str(idx) not in st.session_state:
                     st.session_state["checkbox" + keyid + str(idx)] = False
-
+                # send info to user
                 st.rerun()
+
+
 
     def update_ticket_status(self, ticket_id, new_status, responsible, idx, keyid):
         st.session_state["ticket_status" + keyid + str(idx)] = new_status
@@ -255,7 +259,6 @@ class HelpdeskApp:
 
 
     def display_tickets(self):
-        st.session_state
         st.write(f'#### :male-astronaut: {st.session_state["user_fullname"]}')
         sign_out = st.button("Atsijungti", key='logout_btn')
         if sign_out:
@@ -271,11 +274,12 @@ class HelpdeskApp:
 
 if __name__ == "__main__":
 
-    app = HelpdeskApp()
+    main = HelpdeskApp()
+    app = StreamlitAuth()
     # Patikrina ar vartotojas yra prisijunges, jeigu ne tai perkelia prie prisijungimo lango, jeigu taip tai perkelia prie užduočių lango.
     if "logged_in" not in st.session_state:
         st.session_state["logged_in"] = False
     if st.session_state["logged_in"]:
-        app.display_tickets()
+        main.display_tickets()
     else:
-        StreamlitAuth()
+        app.run()

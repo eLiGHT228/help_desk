@@ -4,9 +4,12 @@ from config.config import server_address, username, password, base_dn
 blacklist = ['admindarlip', 'adminerngin']
 def connect_AD(usrnm=username, psswrd=password):
     server = Server(server_address, get_info=ALL)
-    conn = Connection(server, user=usrnm, password=psswrd, auto_bind=True)
-
-    return conn
+    try:
+        conn = Connection(server, user=usrnm, password=psswrd, auto_bind=True)
+        return conn
+    except:
+        return False
+    # return conn
 
 
 def get_ad_users():
@@ -89,6 +92,28 @@ def get_fullname(admin):
     # Unbind from the server
     conn.unbind()
 
+def get_fullname_u(user):
+
+    from ldap3 import Server, Connection, SUBTREE
+    from config.config import server_address, username, password, base_dn
+
+    # Connect to the AD server
+    server = Server(server_address)
+    conn = Connection(server, user=username, password=password)
+    conn.bind()
+
+    search_filter = f'(&(objectClass=user)(sAMAccountName={user}))'  # Modify this filter as needed
+    conn.search(search_base=base_dn,
+                search_filter=search_filter,
+                search_scope=SUBTREE,
+                attributes=['displayName'])
+
+    # Print the found users' sAMAccountName
+    for entry in conn.entries:
+        return entry.displayName.value
+    # Unbind from the server
+    conn.unbind()
+
 def get_responsible():
 
     from ldap3 import Server, Connection, SUBTREE
@@ -135,3 +160,25 @@ def get_responsible():
 
     # Unbind from the server
     conn.unbind()
+
+def get_office(user):
+    office_numbers = set()
+    office_numbers.add("")
+
+
+    # Establish connection
+    conn = connect_AD()
+
+    # Search for users with office numbers
+    conn.search(base_dn, f'(&(objectClass=user)(sAMAccountName={user}))',
+                attributes="physicalDeliveryOfficeName")
+
+    if 'physicalDeliveryOfficeName' in conn.entries[0]:
+        result = conn.entries[0]['physicalDeliveryOfficeName']
+        conn.unbind()
+        return result
+    else:
+        conn.unbind()
+        return None
+
+
