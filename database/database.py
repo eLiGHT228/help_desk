@@ -10,16 +10,14 @@ Base = declarative_base()
 class User(Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
-    mail = Column(String)
     name = Column(String)
     email = Column(String)
-    phone = Column(String)
     room_nr = Column(String)
     created_date = Column(DateTime, default=datetime.datetime.utcnow)
 
 class Ticket(Base):
     __tablename__ = 'tickets'
-    id = Column(Integer, primary_key=True)
+    id = Column(String, primary_key=True)
     user_id = Column(Integer, ForeignKey('users.id'))
     topic = Column(String)
     category = Column(String)

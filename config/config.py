@@ -1,15 +1,14 @@
-import streamlit_authenticator as stauth
 # server config
 server_address = 'ldap://10.230.242.2'
-username = 'admindarole@vrsa.local'
-password = 'MGSQLPython1991'
+username = 'helpdeskVRSA@vrsa.local'
+password = 'ITspec2024+'
 base_dn = 'dc=vrsa,dc=local'
 
 database = 'sqlite:///database/helpdesk.db'
 
 # mail
 
-send_to_admins = ['darius.olechnovic@vrsa.lt']  # 'Vitalij.moroz@vrsa.lt', '', '', '', '', '']
+send_to_admins = ['darius.olechnovic@vrsa.lt']#, 'robert.kliukovski@vrsa.lt', 'Vitalij.moroz@vrsa.lt'] #, '', '', '', '', '']
 sender_email = 'helpdesk@vrsa.lt'
 sender_password = 'Rajonas2024+'
 

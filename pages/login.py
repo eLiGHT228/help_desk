@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit_authenticator as stauth
 import time
 from integrations.AD import connect_AD, get_fullname, get_fullname_u, get_office
 
@@ -35,7 +34,6 @@ class StreamlitAuth:
                 st.session_state["user_fullname"] = get_fullname('adminrobkliu')
             else:
                 st.session_state["user_fullname"] = get_fullname(st.session_state["user_name"])
-
             with st.spinner(''):
                 time.sleep(1)
                 st.success('Prisijungimas sėkmingas!')
@@ -52,10 +50,11 @@ class StreamlitAuth:
 
 if __name__ == "__main__":
     # Patikrina ar vartotojas yra prisijunges, jeigu ne tai perkelia prie prisijungimo lango, jeigu taip tai perkelia prie užduočių lango.
-    app = StreamlitAuth()
     if "logged_in" not in st.session_state:
         st.session_state["logged_in"] = False
     if st.session_state["logged_in"]:
+        app = StreamlitAuth()
         app.check_roles()
     else:
+        app = StreamlitAuth()
         app.run()

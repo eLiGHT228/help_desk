@@ -6,6 +6,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from config.config import sender_email, sender_password, send_to_admins, stconfig
+from datetime import datetime
 
 class HelpDesk:
     def __init__(self):
@@ -17,6 +18,8 @@ class HelpDesk:
         if sign_out:
             st.session_state["logged_in"] = False
             st.rerun()
+        if st.session_state.get("user_fullname", "") == "Stanislav Sokolovskis":
+            st.image('uploaded_images/20240412_124302.jpg', "Stanislavu")
         st.title("VRSA IT palaikymo sistema")
         with st.container(border=True):
             user_name = st.text_input('Vardas', value=st.session_state.get("user_fullname", ""), disabled=True)
@@ -85,10 +88,11 @@ class HelpDesk:
                     self.session.commit()
                 else:
                     new_user = existing_user
+                self.id_maker(category, category_type)
 
-                new_ticket = Ticket(user_id=new_user.id, topic=ticket_name, category=category,
+                new_ticket = Ticket(id=self.unique_id + datetime.now().strftime("%m%d%H%M%S"), user_id=new_user.id, topic=ticket_name, category=category,
                                     category_type=category_type, cat_type=cat_type, description=description,
-                                    image_path=None, status="Sukurta", responsible=" ")
+                                    image_path=None, status="Sukurta", responsible=" ")  # id = self.id
 
                 if uploaded_file is not None:
                     with open("uploaded_images/" + uploaded_file.name, "wb") as f:
@@ -100,8 +104,49 @@ class HelpDesk:
                 self.session.commit()
                 with st.spinner('Siųnčiama...'):
                     time.sleep(3)
-                st.success(f"Ačiū, {user_name}! Jūsų prašymas išsiųstas.")
+                st.success(f"Ačiū, {user_name}! Tavo prašymas išsiųstas.")
                 self.send_info(user_name, send_to_admins)
+
+    def id_maker(self, cat, cat_type):
+        if cat == "Įranga" and cat_type == "Kompiuteris":
+            self.unique_id = "IKO"
+        elif cat == "Įranga" and cat_type == "Skaitytuvas":
+            self.unique_id = "ISK"
+        elif cat == "Įranga" and cat_type == "Spausdintuvas":
+            self.unique_id = "ISP"
+        elif cat == "Įranga" and cat_type == "Kita":
+            self.unique_id = "IKI"
+        elif cat == "Programos" and cat_type == "DVS":
+            self.unique_id = "PD"
+        elif cat == "Programos" and cat_type == "Labbis":
+            self.unique_id = "PL"
+        elif cat == "Programos" and cat_type == "Mokesta":
+            self.unique_id = "PM"
+        elif cat == "Programos" and cat_type == "Parama":
+            self.unique_id = "PP"
+        elif cat == "Programos" and cat_type == "Kita":
+            self.unique_id = "PKI"
+        else:
+            self.unique_id = "KI"
+            self.unique_id = "KI"
+    #
+    # def ticket_checker(self):
+    #
+    #     self.latest_ticket = (
+    #         self.session.query(Ticket)
+    #         .filter_by(cat_type=self.unique_id)
+    #         .order_by(Ticket.id.desc())
+    #         .first()
+    #     )
+    #     if self.latest_ticket is None:
+    #     self.id = f"{self.cat_type}1"
+    # else:
+    #     # Extract the number from the latest ticket's ID
+    #     num_str = latest_ticket.id[len(self.cat_type):]
+    #     num = int(num_str) + 1
+    #     self.id = f"{self.cat_type}{num}"
+
+
 
     def send_info(self, user_name, list):
         for receiver in list:
@@ -114,7 +159,7 @@ class HelpDesk:
 
 
             # Add body to email
-            body = (f'Sveiki! \n \n {user_name} užregistravo naują užduotį! \n \n \n \n Palaikymo sistemos puslapio nuoroda: {link}')
+            body = (f'Sveiki! \n \n {user_name} užregistravo naują tiketą! \n \n \n \n Palaikymo sistemos puslapio nuoroda: {link}')
             # f'<a href='){helpdesk:8501}'>Click here</a> '
             message.attach(MIMEText(body, 'plain'))
 
@@ -138,10 +183,8 @@ class HelpDesk:
 if __name__ == "__main__":
     # Patikrina ar vartotojas yra prisijunges, jeigu ne tai perkelia prie prisijungimo lango, jeigu taip tai perkelia prie užduočių lango.
     if "logged_in" not in st.session_state:
-        print("not")
         st.session_state["logged_in"] = False
     if st.session_state["logged_in"]:
-        print("help_desk")
         help_desk_app = HelpDesk()
         help_desk_app.run()
     else:
