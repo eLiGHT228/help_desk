@@ -162,10 +162,6 @@ def get_responsible():
     conn.unbind()
 
 def get_office(user):
-    office_numbers = set()
-    office_numbers.add("")
-
-
     # Establish connection
     conn = connect_AD()
 

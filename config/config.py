@@ -1,3 +1,4 @@
+import streamlit_authenticator as stauth
 # server config
 server_address = 'ldap://10.230.242.2'
 username = 'admindarole@vrsa.local'

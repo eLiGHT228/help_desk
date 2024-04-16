@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit_authenticator as stauth
 import time
 from integrations.AD import connect_AD, get_fullname, get_fullname_u, get_office
 
@@ -32,16 +33,14 @@ class StreamlitAuth:
         if st.session_state["user_name"][0:5] == 'admin':
             if st.session_state["user_name"] == 'adminrobkli':
                 st.session_state["user_fullname"] = get_fullname('adminrobkliu')
-                print("robkliu")
             else:
                 st.session_state["user_fullname"] = get_fullname(st.session_state["user_name"])
-                print(st.session_state["user_name"])
+
             with st.spinner(''):
                 time.sleep(1)
                 st.success('Prisijungimas sėkmingas!')
                 st.switch_page("pages/dashboard.py")
         else:
-            print("else")
             st.session_state["user_fullname"] = get_fullname_u(st.session_state["user_name"])
             st.session_state['room_nr'] = get_office(st.session_state["user_name"])
             with st.spinner(''):

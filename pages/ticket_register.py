@@ -100,7 +100,7 @@ class HelpDesk:
                 self.session.commit()
                 with st.spinner('Siųnčiama...'):
                     time.sleep(3)
-                st.success(f"Ačiū, {user_name}! Tavo prašymas išsiųstas.")
+                st.success(f"Ačiū, {user_name}! Jūsų prašymas išsiųstas.")
                 self.send_info(user_name, send_to_admins)
 
     def send_info(self, user_name, list):
@@ -114,7 +114,7 @@ class HelpDesk:
 
 
             # Add body to email
-            body = (f'Sveiki! \n \n {user_name} užregistravo naują tiketą! \n \n \n \n Palaikymo sistemos puslapio nuoroda: {link}')
+            body = (f'Sveiki! \n \n {user_name} užregistravo naują užduotį! \n \n \n \n Palaikymo sistemos puslapio nuoroda: {link}')
             # f'<a href='){helpdesk:8501}'>Click here</a> '
             message.attach(MIMEText(body, 'plain'))
 
