@@ -1,24 +1,25 @@
 import datetime
 
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, DateTime
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
-from werkzeug.security import generate_password_hash, check_password_hash
 
 Base = declarative_base()
 
 class User(Base):
     __tablename__ = 'users'
-    id = Column(Integer, primary_key=True)
+    id = Column(String, primary_key=True)
     name = Column(String)
     email = Column(String)
     room_nr = Column(String)
     created_date = Column(DateTime, default=datetime.datetime.utcnow)
 
+    tickets = relationship("Ticket", back_populates="user")
+
 class Ticket(Base):
     __tablename__ = 'tickets'
     id = Column(String, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
+    user_id = Column(String, ForeignKey('users.id'))
     topic = Column(String)
     category = Column(String)
     category_type = Column(String)
@@ -30,6 +31,19 @@ class Ticket(Base):
     created_date = Column(DateTime, default=datetime.datetime.utcnow)
 
     user = relationship("User", back_populates="tickets")
+    comments = relationship("Comment", back_populates="ticket")
+
+
+class Comment(Base):
+    __tablename__ = 'comments'
+    id = Column(Integer, primary_key=True)
+    ticket_id = Column(String, ForeignKey('tickets.id'))
+    author = Column(String)
+    author_type = Column(String)
+    content = Column(Text)
+    post_date = Column(DateTime, default=datetime.datetime.utcnow)
+
+    ticket = relationship("Ticket", back_populates="comments")
 
 class Admin(Base):
 

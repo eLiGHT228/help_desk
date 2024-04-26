@@ -30,6 +30,12 @@ def stconfig():
         [data-testid="collapsedControl"]{
             display: none;
             }
+        .sidebar .sidebar-content {
+            padding-left: 0 !important;
+        }
+        .sidebar .sidebar-content .collapse-button {
+            display: none !important;
+        }
     </style>
     """,
         unsafe_allow_html=True,

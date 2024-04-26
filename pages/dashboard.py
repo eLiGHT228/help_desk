@@ -1,14 +1,13 @@
 import pandas as pd
+from config.config import stconfig
 import streamlit as st
 from sqlalchemy import create_engine, desc
 from sqlalchemy.orm import sessionmaker
-from database.database import Base, Ticket, User  # Admin
+from database.database import Base, Ticket, User, Comment  # Admin
 from pages.login import StreamlitAuth
 from config.config import stconfig, database
 from integrations.AD import get_responsible
 from streamlit_extras.stylable_container import stylable_container
-
-stconfig()
 
 
 class HelpdeskApp:
@@ -23,7 +22,6 @@ class HelpdeskApp:
         if "current_page" not in st.session_state:
             st.session_state["current_page"] = 1
         self.date_format = '%Y-%m-%d %H:%M'
-
 
     def filter_by_status(self):
         filters = st.selectbox("Filtruoti pagal:", ("Kategorija", "Būsena", "Atsakingas"), index=None,
@@ -46,6 +44,7 @@ class HelpdeskApp:
                 self.responsible,
             )
             self.tickets = self.tickets.filter(Ticket.responsible == selected_filter)
+        return self.tickets
 
     @staticmethod
     def show_headers():
@@ -85,7 +84,6 @@ class HelpdeskApp:
         else:
             st.write('### No tickets found')
 
-
     def footbar(self, total_pages, id):
         st.write(f"Page: {st.session_state["current_page"]}")
         prev_btn, _, next_btn = st.columns(3)
@@ -98,7 +96,6 @@ class HelpdeskApp:
                 st.session_state["current_page"] += 1
                 st.rerun()
 
-
     #  visu užregistruotu užduočių ištraukimas iš duomenų bazes.
     def load_data(self):
         self.tickets = (self.session.query(Ticket, User).outerjoin(User, Ticket.user_id == User.id)
@@ -109,18 +106,17 @@ class HelpdeskApp:
         self.ticket_sti_counta = self.session.query(Ticket).filter_by(status='Išspręsta').count()
         self.ticket_stu_counta = self.session.query(Ticket).filter_by(status='Uždaryta').count()
 
-
     #  prisijungusio vartotojo priskirtų užduočiu ištraukimas iš duomenų bazes.
     def load_my_data(self):
         self.tickets = (self.session.query(Ticket, User).outerjoin(User, Ticket.user_id == User.id)
-                            .where(Ticket.responsible == st.session_state['user_fullname'])
+                        .where(Ticket.responsible == st.session_state['user_fullname'])
                         .order_by(desc(Ticket.created_date)))
         self.ticket_stv_count = self.session.query(Ticket).filter_by(responsible=st.session_state['user_fullname'],
-                                                                  status='Vykdoma').count()
+                                                                     status='Vykdoma').count()
         self.ticket_sti_count = self.session.query(Ticket).filter_by(responsible=st.session_state['user_fullname'],
-                                                                  status='Išspręsta').count()
+                                                                     status='Išspręsta').count()
         self.ticket_stu_count = self.session.query(Ticket).filter_by(responsible=st.session_state['user_fullname'],
-                                                                  status='Uždaryta').count()
+                                                                     status='Uždaryta').count()
 
     def display_ticket_info(self, idx, ticket, user, key):
         if ticket.responsible == " ":
@@ -171,7 +167,7 @@ class HelpdeskApp:
         col5.write(ticket.topic)
         col6.write(ticket.category_type)
         col7.write(ticket.status)
-        if "ticket_status" + keyid + str(idx)not in st.session_state:
+        if "ticket_status" + keyid + str(idx) not in st.session_state:
             st.session_state["ticket_status" + keyid + str(idx)] = ticket.status
         col8.write(ticket.responsible)
         if "ticket_responsible" + keyid + str(idx) not in st.session_state:
@@ -221,7 +217,44 @@ class HelpdeskApp:
                 # send info to user
                 st.rerun()
 
+            with st.container(border=True):
+                st.subheader("Komentarai")
+                messages = self.session.query(Comment).filter_by(ticket_id=ticket.id)
+                for comment in messages:
+                    if comment.author_type == "Admin":
+                        with stylable_container(key="Container" + str(comment.id) + keyid + str(idx), css_styles="""
+                                {
+                                    border: 2px solid rgba(49, 51, 63, 0.2);
+                                    border-radius: 0.5rem;
+                                    padding: calc(1em - 1px);
+                                    background-color: rgba(144, 238, 144, 0.5); /* Transparent light green background */
+                                }
+                            """):
 
+                            with st.chat_message("user"):
+                                st.write(comment.post_date)
+                                st.write(comment.author)
+                                st.write(comment.content)
+                    else:
+                        with stylable_container(key="Container" + str(comment.id) + keyid + str(idx), css_styles="""
+                                {
+                                    border: 2px solid rgba(49, 51, 63, 0.2);
+                                    border-radius: 0.5rem;
+                                    padding: calc(1em - 1px);
+                                    background-color: rgba(144, 144, 144, 0.5); /* Transparent light green background */
+                                }
+                            """):
+                            with st.chat_message("user"):
+                                st.write(comment.post_date)
+                                st.write(comment.author)
+                                st.write(comment.content)
+                prompt = st.chat_input("Komentaras", key="ch_i" + keyid + str(idx))
+                if prompt:
+                    new_message = Comment(ticket_id=ticket.id, author=st.session_state.get("user_fullname", "")
+                                          , author_type="Admin", content=prompt)
+                    self.session.add(new_message)
+                    self.session.commit()
+                    st.rerun()
 
     def update_ticket_status(self, ticket_id, new_status, responsible, idx, keyid):
         st.session_state["ticket_status" + keyid + str(idx)] = new_status
@@ -237,8 +270,8 @@ class HelpdeskApp:
         self.load_my_data()
         st.write("### Jusu užduočių statistika")
         chart_data = pd.DataFrame(
-                columns =["Vykdoma", "Išspręsta", "Uždaryta"],
-                # [self.ticket_stv_count, self.ticket_sti_count, self.ticket_stu_count]
+            columns=["Vykdoma", "Išspręsta", "Uždaryta"],
+            # [self.ticket_stv_count, self.ticket_sti_count, self.ticket_stu_count]
         )
 
         data = [dict(Busena='Vykdoma', Kiekis=self.ticket_stv_count),
@@ -257,7 +290,6 @@ class HelpdeskApp:
         df = pd.DataFrame(data)
         st.dataframe(df, hide_index=True)
 
-
     def display_tickets(self):
         st.write(f'#### :male-astronaut: {st.session_state["user_fullname"]}')
         sign_out = st.button("Atsijungti", key='logout_btn')
@@ -272,8 +304,10 @@ class HelpdeskApp:
         with tab3:
             self.result_view()
 
+
 if __name__ == "__main__":
 
+    stconfig()
     main = HelpdeskApp()
     app = StreamlitAuth()
     # Patikrina ar vartotojas yra prisijunges, jeigu ne tai perkelia prie prisijungimo lango, jeigu taip tai perkelia prie užduočių lango.
@@ -282,4 +316,4 @@ if __name__ == "__main__":
     if st.session_state["logged_in"]:
         main.display_tickets()
     else:
-        app.run()
+        st.switch_page("pages/login.py")
