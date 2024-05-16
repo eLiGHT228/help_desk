@@ -1,6 +1,6 @@
 import streamlit as st
 import time
-from database.database import User, Ticket, engine, Comment
+from database.database import User, Ticket, engine, Comment, TicketStatus
 from sqlalchemy import desc
 from sqlalchemy.orm import sessionmaker
 import smtplib
@@ -106,14 +106,14 @@ class HelpDesk:
                         new_user = User(id=self.userid, name=self.user_fullname, room_nr=room_nr)
                         self.session.add(new_user)
                         self.session.commit()
-                    # else:
-                        # new_user = existing_user
-                    self.id_maker(category, category_type)
 
+                    self.id_maker(category, category_type)
+                    ticket_id = self.unique_id + datetime.now().strftime("%m%d%H%M%S")
                     new_ticket = Ticket(id=self.unique_id + datetime.now().strftime("%m%d%H%M%S"), user_id=self.userid,
                                         topic=ticket_name, category=category,
                                         category_type=category_type, cat_type=cat_type, description=description,
                                         image_path=None, status="Sukurta", responsible=" ")
+
 
                     if uploaded_file is not None:
                         with open("uploaded_images/" + uploaded_file.name, "wb") as f:
@@ -122,13 +122,22 @@ class HelpDesk:
                         uploaded_file.seek(0)
 
                     self.session.add(new_ticket)
+
+                    ticket_status = TicketStatus(ticket_id=ticket_id, author=st.session_state["user_fullname"],
+                                                 status="Sukurta")
+
+                    self.session.add(ticket_status)
+
+                    ticket_comment = Comment(ticket_id=ticket_id, author=st.session_state.get("user_fullname", "")
+                                              , author_type="User", content=description)
+                    self.session.add(ticket_comment)
                     self.session.commit()
                     with st.spinner('Siųnčiama...'):
                         time.sleep(3)
                     st.success(f"Ačiū, {self.user_fullname}! Tavo prašymas išsiųstas.")
                     self.send_info(self.user_fullname, send_to_admins)
         with tab2:
-            self.tickets = (self.session.query(Ticket, User).outerjoin(Ticket.user)
+            self.tickets = (self.session.query(Ticket, User).outerjoin(User, Ticket.user_id == User.id)
                             .filter(User.name == st.session_state.get("user_fullname", ""))
                             .order_by(desc(Ticket.created_date)))
 
@@ -167,56 +176,97 @@ class HelpDesk:
                 self.show_more(ticket, user, keyid, idx)
 
     def show_more(self, ticket, user, keyid, idx):
-        with st.container(border=True):
-
+        colm1, colm2 = st.columns([6, 2])
+        with colm1.container(border=True):
             st.write("Užduoties informacija:")
             with st.container(border=True):
-                st.write("Kabinetas: " + str(user.room_nr))
+                st.write("Ikelimo data: " + str(ticket.created_date)[0:16])
             with st.container(border=True):
-                st.write("Komentaras: " + ticket.description)
+                st.write("Užsakovas: " + user.name)
+            with st.container(border=True):
+                st.write("Kabinetas: " + str(user.room_nr))
 
             if ticket.image_path:
                 st.image(ticket.image_path, width=500)
             else:
                 st.write("Nėra jokiu paveiksliukų")
-            st.write(st.session_state["ticket_status" + keyid + str(idx)])
+            tb1, tb2 = st.tabs(["Komentarai", "Užduoties istorija"])
+            with tb1:
+                with st.container(border=True):
+                    messages = self.session.query(Comment).filter_by(ticket_id=ticket.id)
+                    for comment in messages:
+                        if comment.author_type == "User":
+                            with stylable_container(key="Container" + str(comment.id) + keyid + str(idx), css_styles="""
+                                             {
+                                                 border: 2px solid rgba(49, 51, 63, 0.2);
+                                                 border-radius: 0.5rem;
+                                                 padding: calc(1em - 1px);
+                                                 background-color: rgba(144, 238, 144, 0.5); /* Transparent light green background */
+                                             }
+                                         """):
+
+                                with st.chat_message("user"):
+                                    st.write(str(comment.post_date)[0:16])
+                                    st.write(comment.author)
+                                    st.write(comment.content)
+                        else:
+                            with stylable_container(key="Container" + str(comment.id) + keyid + str(idx), css_styles="""
+                                             {
+                                                 border: 2px solid rgba(49, 51, 63, 0.2);
+                                                 border-radius: 0.5rem;
+                                                 padding: calc(1em - 1px);
+                                                 background-color: rgba(144, 144, 144, 0.5); /* Transparent light green background */
+                                             }
+                                         """):
+                                with st.chat_message("user"):
+                                    st.write(str(comment.post_date)[0:16])
+                                    st.write(comment.author)
+                                    st.write(comment.content)
+                    prompt = st.chat_input("Komentaras", key="ch_i" + keyid + str(idx))
+                    if prompt:
+                        new_message = Comment(ticket_id=ticket.id, author=st.session_state.get("user_fullname", "")
+                                              , author_type="User", content=prompt)
+                        self.session.add(new_message)
+                        self.session.commit()
+                        st.rerun()
+
+            with tb2:
+                status_history = self.session.query(TicketStatus).filter_by(ticket_id=ticket.id)
+                if status_history:
+                    for statuses in status_history:
+                        with st.container(border=True):
+                            st.write(f"{statuses.status_date}        Jūsų užklausos būsena pakeista į : {statuses.status}")
+                else:
+                    st.write("nera istorijos")
+        with colm2.container(border=True):
             with st.container(border=True):
-                st.subheader("Komentarai")
-                messages = self.session.query(Comment).filter_by(ticket_id=ticket.id)
-                for comment in messages:
-                    if comment.author_type == "User":
-                        with stylable_container(key="Container" + str(comment.id) + keyid + str(idx), css_styles="""
-                                {
-                                    border: 2px solid rgba(49, 51, 63, 0.2);
-                                    border-radius: 0.5rem;
-                                    padding: calc(1em - 1px);
-                                    background-color: rgba(144, 238, 144, 0.5); /* Transparent light green background */
-                                }
-                            """):
-                            with st.chat_message("user"):
-                                st.write(comment.post_date)
-                                st.write(comment.author)
-                                st.write(comment.content)
-                    else:
-                        with stylable_container(key="Container" + str(comment.id) + keyid + str(idx), css_styles="""
-                                {
-                                    border: 2px solid rgba(49, 51, 63, 0.2);
-                                    border-radius: 0.5rem;
-                                    padding: calc(1em - 1px);
-                                    background-color: rgba(144, 144, 144, 0.5); /* Transparent light green background */
-                                }
-                            """):
-                            with st.chat_message("user"):
-                                st.write(comment.post_date)
-                                st.write(comment.author)
-                                st.write(comment.content)
-                prompt = st.chat_input("Komentaras", key="ch_i" + keyid + str(idx))
-                if prompt:
-                    new_message = Comment(ticket_id=ticket.id, author=st.session_state.get("user_fullname", "")
-                                          , author_type="User", content=prompt)
-                    self.session.add(new_message)
-                    self.session.commit()
-                    st.rerun()
+                st.write(f"Būsena: {ticket.status}")
+            with st.container(border=True):
+                st.write(f"Užklausos tipas: {ticket.category}")
+            if st.button("Ištrinti užduoti"):
+
+                self.delete_ticket(ticket.id)
+                st.success("Užduotis pašalinta!")
+                self.uncheck_all_checkboxes()
+                time.sleep(1)
+                st.rerun()
+
+    def delete_ticket(self, ticket_id):
+        ticket_to_delete = self.session.query(Ticket).filter(Ticket.id == ticket_id).first()
+        if ticket_to_delete:
+            self.session.delete(ticket_to_delete)
+            self.session.commit()
+
+        else:
+            st.error("Įrašo rasti nepavyko.")
+
+    def uncheck_all_checkboxes(self):
+        # Iterate over all items in session state and uncheck checkboxes
+        for key in st.session_state.keys():
+            if key.startswith("checkbox"):
+                del st.session_state[key]
+                if key not in st.session_state:
+                    st.session_state[key] = False
 
     def filter_by_status(self):
         filters = st.selectbox("Filtruoti pagal:", ("Kategorija", "Būsena", "Atsakingas"), index=None,

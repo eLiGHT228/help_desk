@@ -3,7 +3,7 @@ from config.config import stconfig
 import streamlit as st
 from sqlalchemy import create_engine, desc
 from sqlalchemy.orm import sessionmaker
-from database.database import Base, Ticket, User, Comment  # Admin
+from database.database import Base, Ticket, User, Comment, TicketStatus  # Admin
 from pages.login import StreamlitAuth
 from config.config import stconfig, database
 from integrations.AD import get_responsible
@@ -179,13 +179,15 @@ class HelpdeskApp:
             self.show_more(ticket, user, keyid, idx)
 
     def show_more(self, ticket, user, keyid, idx):
-        with st.container(border=True):
-
+        colm1, colm2 = st.columns([6, 2])
+        with colm1.container(border=True):
             st.write("Užduoties informacija:")
             with st.container(border=True):
-                st.write("Kabinetas: " + str(user.room_nr))
+                st.write("Ikelimo data: " + str(ticket.created_date)[0:16])
             with st.container(border=True):
-                st.write("Komentaras: " + ticket.description)
+                st.write("Užsakovas: " + user.name)
+            with st.container(border=True):
+                st.write("Kabinetas: " + str(user.room_nr))
 
             if ticket.image_path:
                 st.image(ticket.image_path, width=500)
@@ -198,7 +200,6 @@ class HelpdeskApp:
                                   help="Pasirinkite būseną...", index=status_index,
                                   placeholder=st.session_state["ticket_status" + keyid + str(idx)],
                                   key="selectbox" + keyid + str(idx) + "1")
-            st.write(st.session_state["ticket_status" + keyid + str(idx)])
             responsible_index = self.responsible.index(
                 st.session_state["ticket_responsible" + keyid + str(idx)])
             responsible = st.selectbox("Atsakingas", self.responsible, index=responsible_index,
@@ -216,45 +217,60 @@ class HelpdeskApp:
                     st.session_state["checkbox" + keyid + str(idx)] = False
                 # send info to user
                 st.rerun()
+            tb1, tb2 = st.tabs(["Komentarai", "Užduoties istorija"])
+            with tb1:
+                with st.container(border=True):
+                    messages = self.session.query(Comment).filter_by(ticket_id=ticket.id)
+                    for comment in messages:
+                        if comment.author_type == "Admin":
+                            with stylable_container(key="Container" + str(comment.id) + keyid + str(idx), css_styles="""
+                                    {
+                                        border: 2px solid rgba(49, 51, 63, 0.2);
+                                        border-radius: 0.5rem;
+                                        padding: calc(1em - 1px);
+                                        background-color: rgba(144, 238, 144, 0.5); /* Transparent light green background */
+                                    }
+                                """):
 
+                                with st.chat_message("user"):
+                                    st.write(comment.post_date)
+                                    st.write(comment.author)
+                                    st.write(comment.content)
+                        else:
+                            with stylable_container(key="Container" + str(comment.id) + keyid + str(idx), css_styles="""
+                                    {
+                                        border: 2px solid rgba(49, 51, 63, 0.2);
+                                        border-radius: 0.5rem;
+                                        padding: calc(1em - 1px);
+                                        background-color: rgba(144, 144, 144, 0.5); /* Transparent light green background */
+                                    }
+                                """):
+                                with st.chat_message("user"):
+                                    st.write(comment.post_date)
+                                    st.write(comment.author)
+                                    st.write(comment.content)
+                    prompt = st.chat_input("Komentaras", key="ch_i" + keyid + str(idx))
+                    if prompt:
+                        new_message = Comment(ticket_id=ticket.id, author=st.session_state.get("user_fullname", "")
+                                              , author_type="Admin", content=prompt)
+                        self.session.add(new_message)
+                        self.session.commit()
+                        st.rerun()
+
+            with tb2:
+                status_history = self.session.query(TicketStatus).filter_by(ticket_id=ticket.id)
+                if status_history:
+                    for statuses in status_history:
+                        with st.container(border=True):
+                            st.write(
+                                f"{statuses.status_date}        Užklausos būsena pakeista į : {statuses.status}")
+                else:
+                    st.write("nera istorijos")
+        with colm2.container(border=True):
             with st.container(border=True):
-                st.subheader("Komentarai")
-                messages = self.session.query(Comment).filter_by(ticket_id=ticket.id)
-                for comment in messages:
-                    if comment.author_type == "Admin":
-                        with stylable_container(key="Container" + str(comment.id) + keyid + str(idx), css_styles="""
-                                {
-                                    border: 2px solid rgba(49, 51, 63, 0.2);
-                                    border-radius: 0.5rem;
-                                    padding: calc(1em - 1px);
-                                    background-color: rgba(144, 238, 144, 0.5); /* Transparent light green background */
-                                }
-                            """):
-
-                            with st.chat_message("user"):
-                                st.write(comment.post_date)
-                                st.write(comment.author)
-                                st.write(comment.content)
-                    else:
-                        with stylable_container(key="Container" + str(comment.id) + keyid + str(idx), css_styles="""
-                                {
-                                    border: 2px solid rgba(49, 51, 63, 0.2);
-                                    border-radius: 0.5rem;
-                                    padding: calc(1em - 1px);
-                                    background-color: rgba(144, 144, 144, 0.5); /* Transparent light green background */
-                                }
-                            """):
-                            with st.chat_message("user"):
-                                st.write(comment.post_date)
-                                st.write(comment.author)
-                                st.write(comment.content)
-                prompt = st.chat_input("Komentaras", key="ch_i" + keyid + str(idx))
-                if prompt:
-                    new_message = Comment(ticket_id=ticket.id, author=st.session_state.get("user_fullname", "")
-                                          , author_type="Admin", content=prompt)
-                    self.session.add(new_message)
-                    self.session.commit()
-                    st.rerun()
+                st.write(f"Būsena: {ticket.status}")
+            with st.container(border=True):
+                st.write(f"Užklausos tipas: {ticket.category}")
 
     def update_ticket_status(self, ticket_id, new_status, responsible, idx, keyid):
         st.session_state["ticket_status" + keyid + str(idx)] = new_status
@@ -262,9 +278,16 @@ class HelpdeskApp:
 
         ticket = self.session.query(Ticket).filter_by(id=ticket_id).first()
         if ticket:
+            if ticket.status != new_status:
+                ticket_status = TicketStatus(ticket_id=ticket_id, author=st.session_state["user_fullname"],
+                                              status=new_status)
+                self.session.add(ticket_status)
+            else:
+                pass
             ticket.status = new_status
             ticket.responsible = responsible
             self.session.commit()
+
 
     def result_view(self):
         self.load_my_data()

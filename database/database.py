@@ -32,7 +32,7 @@ class Ticket(Base):
 
     user = relationship("User", back_populates="tickets")
     comments = relationship("Comment", back_populates="ticket")
-
+    ticket_status = relationship("TicketStatus", back_populates="ticket_r")
 
 class Comment(Base):
     __tablename__ = 'comments'
@@ -45,6 +45,15 @@ class Comment(Base):
 
     ticket = relationship("Ticket", back_populates="comments")
 
+class TicketStatus(Base):
+    __tablename__ = 'ticket_status'
+    id = Column(Integer, primary_key=True)
+    ticket_id = Column(String, ForeignKey('tickets.id'))
+    author = Column(String)
+    status = Column(Text)
+    status_date = Column(DateTime, default=datetime.datetime.utcnow)
+
+    ticket_r = relationship("Ticket", back_populates="ticket_status")
 class Admin(Base):
 
     __tablename__ = 'admins'
