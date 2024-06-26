@@ -13,10 +13,11 @@ class StreamlitAuth:
         if "room_nr" not in st.session_state:
             st.session_state['room_nr'] = None
 
-        # self.run()
-
     def run(self):
-
+        col1, col2, col3 = st.columns((1, 20, 1))
+        col1.image("helpdesk-logo.png", width=65)
+        col2.header("VRSA IT Palaikymo Sistema", divider="red")
+        col2.write("padės mums geriau ir efektyviau valdyti bei spręsti visus Jūsų pagalbos prašymus ir IT užduotis")
         st.title("Prisijungti")
         st.subheader("")
 
@@ -39,6 +40,7 @@ class StreamlitAuth:
             with st.spinner(''):
                 time.sleep(1)
                 st.success('Prisijungimas sėkmingas!')
+                time.sleep(1)
                 st.switch_page("pages/dashboard.py")
         else:
             st.session_state["user_fullname"] = get_fullname_u(st.session_state["user_id"])

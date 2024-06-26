@@ -4,13 +4,18 @@ username = 'helpdeskVRSA@vrsa.local'
 password = 'ITspec2024+'
 base_dn = 'dc=vrsa,dc=local'
 
-database = 'sqlite:///database/helpdesk.db'
-
 # mail
 
-send_to_admins = ['darius.olechnovic@vrsa.lt']#, 'robert.kliukovski@vrsa.lt', 'Vitalij.moroz@vrsa.lt'] #, '', '', '', '', '']
-sender_email = 'helpdesk@vrsa.lt'
-sender_password = 'Rajonas2024+'
+admin_email_list = ['darius.olechnovic@vrsa.lt']#, 'robert.kliukovski@vrsa.lt', 'Vitalij.moroz@vrsa.lt'] #, '', '', '', '', '']
+sender_email = 'darius.olechnovic@vrsa.lt'
+sender_password = 'Vrsa2024*.'
+
+# database
+DB_USERNAME = "root"
+DB_PASSWORD = "ITspec2024+"
+DB_NAME = "helpdeskdb"
+SQLALCHEMY_DATABASE_URI = f'mysql+mysqlconnector://{DB_USERNAME}:{DB_PASSWORD}@localhost:3306/helpdeskdb'
+
 
 
 def stconfig():

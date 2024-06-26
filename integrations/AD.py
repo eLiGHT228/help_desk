@@ -181,4 +181,26 @@ def get_office(user):
         conn.unbind()
         return None
 
+def sinchronize_db_users():
+    session = Session()
+    ad_users = fetch_from_ad()
+
+    for user in ad_users:
+        # Assuming 'cn', 'mail', 'roomNumber' are attributes fetched from AD
+        existing_user = session.query(User).filter_by(name=str(user.cn)).first()
+
+        if existing_user:
+            existing_user.email = str(user.mail)
+            existing_user.room_nr = str(user.roomNumber)
+        else:
+            new_user = User(
+                name=str(user.cn),
+                email=str(user.mail),
+                room_nr=str(user.roomNumber),
+                created_date=datetime.utcnow()
+            )
+            session.add(new_user)
+
+    session.commit()
+    session.close()
 

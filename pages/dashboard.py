@@ -1,27 +1,28 @@
 import pandas as pd
-from config.config import stconfig
 import streamlit as st
-from sqlalchemy import create_engine, desc
+from sqlalchemy import desc, or_
 from sqlalchemy.orm import sessionmaker
-from database.database import Base, Ticket, User, Comment, TicketStatus  # Admin
+from database.database import engine, Ticket, User, Comment, TicketStatus  # Admin
 from pages.login import StreamlitAuth
-from config.config import stconfig, database
+from config.config import stconfig
 from integrations.AD import get_responsible
+from datetime import datetime
 from streamlit_extras.stylable_container import stylable_container
+from mailing.mail import mail_for_user, get_mail
+import time
 
 
 class HelpdeskApp:
     def __init__(self):
-        engine = create_engine(database)
-        Base.metadata.create_all(engine)
-        session = sessionmaker(bind=engine)
-        self.session = session()
+        Session = sessionmaker(bind=engine)
+        self.session = Session()
         self.responsible = get_responsible()
         self.tickets = None
         self.tickets_per_page = 15
         if "current_page" not in st.session_state:
             st.session_state["current_page"] = 1
         self.date_format = '%Y-%m-%d %H:%M'
+
 
     def filter_by_status(self):
         filters = st.selectbox("Filtruoti pagal:", ("Kategorija", "Būsena", "Atsakingas"), index=None,
@@ -46,11 +47,27 @@ class HelpdeskApp:
             self.tickets = self.tickets.filter(Ticket.responsible == selected_filter)
         return self.tickets
 
-    @staticmethod
-    def show_headers():
+    def search(self, search_word):
+        search_pattern = f"%{search_word}%"
+        self.tickets = self.tickets.filter(
+            or_(
+                Ticket.id.like(search_pattern),
+                Ticket.created_date.like(search_pattern),
+                User.name.like(search_pattern),
+                Ticket.topic.like(search_pattern),
+                Ticket.category_type.like(search_pattern),
+                Ticket.status.like(search_pattern),
+                Ticket.responsible.like(search_pattern)
+            )
+        )
+        return self.tickets
+
+
+
+    def show_headers(self):
         st.title('Užduočių sąrašas')
         colms = st.columns((1, 1, 1, 1, 1, 1, 1, 1))
-        fields = ['ID', 'Ikelimo data', 'Vardas', 'Tema', 'Kategorija', 'Būsena', 'Atsakingas', '']
+        fields = ['ID', 'Įkėlimo data', 'Vardas', 'Tema', 'Kategorija', 'Būsena', 'Atsakingas', '']
 
         for col, field_name in zip(colms, fields):
             col.write(field_name)  # header
@@ -65,6 +82,11 @@ class HelpdeskApp:
         end_index = min(start_index + self.tickets_per_page, total_tickets)
 
         if self.tickets and function == self.load_data:
+            colms1, colms2 = st.columns((1, 4))
+            pattern_word = colms1.text_input("Paieška:", key="search1")
+            search_btn = colms1.button("Ieškoti", key="search_btn1")
+            if search_btn:
+                self.search(pattern_word)
             if st.checkbox("Filtruoti", key=f"filter1"):
                 self.filter_by_status()
             self.show_headers()
@@ -74,6 +96,11 @@ class HelpdeskApp:
 
 
         elif self.tickets and function == self.load_my_data:
+            colms1, colms2 = st.columns((1, 4))
+            pattern_word = colms1.text_input("Paieška:", key="search2")
+            search_btn = colms1.button("Ieškoti", key="search_btn2")
+            if search_btn:
+                self.search(pattern_word)
             if st.checkbox("Filtruoti", key=f"filter2"):
                 self.filter_by_status()
             self.show_headers()
@@ -176,10 +203,33 @@ class HelpdeskApp:
         self.placeholder = col9.empty()  # create a placeholder
         self.show_more_btn = self.placeholder.checkbox("Detaliau", key="checkbox" + keyid + str(idx))
         if self.show_more_btn:
+            for key in st.session_state.keys():
+                if key.startswith("checkbox"):
+                    if key == "checkbox" + keyid + str(idx):
+                        continue
+                    else:
+                        del st.session_state[key]
+                        if key not in st.session_state:
+                            st.session_state[key] = False
             self.show_more(ticket, user, keyid, idx)
+
+    @st.experimental_dialog("Ištrinti užduotį")
+    def submit_ticket_delete(self, ticket):
+        st.write("Pašalinus užduoti ją nebegalima bus atkurt.")
+        st.write("Ar tikrai norite ištrinti užduotį?")
+        colum1, colum2 = st.columns((1, 1))
+        if colum1.button("Taip"):
+            self.delete_ticket(ticket.id)
+            st.success("Užduotis pašalinta!")
+            self.uncheck_all_checkboxes()
+            time.sleep(1)
+            st.rerun()
+        if colum2.button("Ne"):
+            st.rerun()
 
     def show_more(self, ticket, user, keyid, idx):
         colm1, colm2 = st.columns([6, 2])
+        self.receiver = [get_mail(ticket.user_id)]
         with colm1.container(border=True):
             st.write("Užduoties informacija:")
             with st.container(border=True):
@@ -211,6 +261,9 @@ class HelpdeskApp:
                 if status == "Sukurta" and responsible != " ":
                     status = "Vykdoma"
                 self.update_ticket_status(ticket.id, status, responsible, idx, keyid)
+
+                mail_for_user(2, receivers=self.receiver, ticket_id=ticket.id, ticket_title=ticket.topic,
+                              timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"), new_status=status)
                 self.show_more = None
                 del st.session_state["checkbox" + keyid + str(idx)]
                 if "checkbox" + keyid + str(idx) not in st.session_state:
@@ -255,15 +308,21 @@ class HelpdeskApp:
                                               , author_type="Admin", content=prompt)
                         self.session.add(new_message)
                         self.session.commit()
+                        mail_for_user(3, receivers=self.receiver, ticket_id=ticket.id, ticket_title=ticket.topic,
+                                      timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"), comment=prompt)
                         st.rerun()
+
 
             with tb2:
                 status_history = self.session.query(TicketStatus).filter_by(ticket_id=ticket.id)
                 if status_history:
                     for statuses in status_history:
                         with st.container(border=True):
-                            st.write(
-                                f"{statuses.status_date}        Užklausos būsena pakeista į : {statuses.status}")
+                            cols1, cols2 = st.columns(2)
+                            with cols1:
+                                st.write(f"Užklausos būsena pakeista į : {statuses.status}")
+                            with cols2:
+                                st.write(f"|{str(statuses.status_date)[0:16]}|")
                 else:
                     st.write("nera istorijos")
         with colm2.container(border=True):
@@ -271,6 +330,30 @@ class HelpdeskApp:
                 st.write(f"Būsena: {ticket.status}")
             with st.container(border=True):
                 st.write(f"Užklausos tipas: {ticket.category}")
+
+            rem_ticket = st.button("Ištrinti užduoti", key=keyid + str(idx))
+            if rem_ticket:
+                try:
+                    self.submit_ticket_delete(ticket)
+                except Exception as e:
+                    st.error("Nepavyko pašalinti užduoties. Prašome pabandyti dar kartą po kurio laiko.")
+
+    def delete_ticket(self, ticket_id):
+        ticket_to_delete = self.session.query(Ticket).filter(Ticket.id == ticket_id).first()
+        if ticket_to_delete:
+            self.session.delete(ticket_to_delete)
+            self.session.commit()
+
+        else:
+            st.error("Įrašo rasti nepavyko.")
+
+    def uncheck_all_checkboxes(self):
+        # Iterate over all items in session state and uncheck checkboxes
+        for key in st.session_state.keys():
+            if key.startswith("checkbox"):
+                del st.session_state[key]
+                if key not in st.session_state:
+                    st.session_state[key] = False
 
     def update_ticket_status(self, ticket_id, new_status, responsible, idx, keyid):
         st.session_state["ticket_status" + keyid + str(idx)] = new_status
@@ -313,9 +396,12 @@ class HelpdeskApp:
         df = pd.DataFrame(data)
         st.dataframe(df, hide_index=True)
 
-    def display_tickets(self):
-        st.write(f'#### :male-astronaut: {st.session_state["user_fullname"]}')
-        sign_out = st.button("Atsijungti", key='logout_btn')
+    def run(self):
+        col1, col2, col3 = st.columns((1, 20, 2))
+        col1.image("helpdesk-logo.png", width=65)
+        col2.header("VRSA IT Palaikymo Sistema", divider="red")
+        col3.write(f'###### :male-astronaut: {st.session_state["user_fullname"]}')
+        sign_out = col3.button("Atsijungti", key='logout_btn')
         if sign_out:
             st.session_state["logged_in"] = False
             st.rerun()
@@ -337,6 +423,6 @@ if __name__ == "__main__":
     if "logged_in" not in st.session_state:
         st.session_state["logged_in"] = False
     if st.session_state["logged_in"]:
-        main.display_tickets()
+        main.run()
     else:
         st.switch_page("pages/login.py")
