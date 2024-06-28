@@ -373,8 +373,9 @@ class HelpdeskApp:
 
 
     def result_view(self):
+        cols1, cols2, cols4 = st.columns((1,1,2))
         self.load_my_data()
-        st.write("### Jusu užduočių statistika")
+        cols1.write("### Jusu užduočių statistika")
         chart_data = pd.DataFrame(
             columns=["Vykdoma", "Išspręsta", "Uždaryta"],
             # [self.ticket_stv_count, self.ticket_sti_count, self.ticket_stu_count]
@@ -385,16 +386,16 @@ class HelpdeskApp:
                 dict(Busena='Uždaryta', Kiekis=self.ticket_stu_count)]
 
         df = pd.DataFrame(data)
-        st.dataframe(df, hide_index=True)
+        cols1.dataframe(df, hide_index=True)
 
-        st.write("### Visų užduočių statistika")
+        cols2.write("### Visų užduočių statistika")
         data = [dict(Busena='Sukurta', Kiekis=self.ticket_sts_counta),
                 dict(Busena='Vykdoma', Kiekis=self.ticket_stv_counta),
                 dict(Busena='Išspręsta', Kiekis=self.ticket_sti_counta),
                 dict(Busena='Uždaryta', Kiekis=self.ticket_stu_counta)]
 
         df = pd.DataFrame(data)
-        st.dataframe(df, hide_index=True)
+        cols2.dataframe(df, hide_index=True)
 
     def run(self):
         col1, col2, col3 = st.columns((1, 20, 2))
